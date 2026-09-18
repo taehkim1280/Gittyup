@@ -38,7 +38,12 @@ int Diff::Callbacks::progress(const git_diff *diff, const char *oldPath,
 
 Diff::Data::Data(git_diff *diff) : diff(diff) {}
 
-Diff::Data::~Data() { git_diff_free(diff); }
+Diff::Data::~Data() {
+  // Cached patches hold a reference into the diff, and member destructors run
+  // after this body, so they have to be released before the diff is freed.
+  warmedPatches.clear();
+  git_diff_free(diff);
+}
 
 const git_diff_delta *Diff::Data::delta(int index) const {
   return git_diff_get_delta(diff, index);
@@ -133,9 +138,33 @@ void Diff::setIndex(const Index &index) { d->index = index; }
 int Diff::count() const { return git_diff_num_deltas(d->diff); }
 
 Patch Diff::patch(int index) const {
+  auto it = d->warmedPatches.constFind(index);
+  if (it != d->warmedPatches.constEnd())
+    return **it;
+
   git_patch *patch = nullptr;
   git_patch_from_diff(&patch, d->diff, index);
   return Patch(patch);
+}
+
+void Diff::warmSubmodulePatches() {
+  // status() hands back an invalid diff when it is cancelled, and count()
+  // dereferences d without checking.
+  if (!d)
+    return;
+
+  for (int i = 0; i < count(); ++i) {
+    const git_diff_delta *delta = d->delta(i);
+    if (!delta || delta->new_file.mode != GIT_FILEMODE_COMMIT)
+      continue;
+
+    if (d->warmedPatches.contains(i))
+      continue;
+
+    git_patch *patch = nullptr;
+    if (!git_patch_from_diff(&patch, d->diff, i))
+      d->warmedPatches.insert(i, QSharedPointer<Patch>::create(Patch(patch)));
+  }
 }
 
 QString Diff::name(int index) const { return d->delta(index)->new_file.path; }

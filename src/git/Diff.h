@@ -14,6 +14,7 @@
 #include "Index.h"
 #include "git2/diff.h"
 #include <QFlags>
+#include <QHash>
 #include <QSharedPointer>
 
 /*!
@@ -66,6 +67,18 @@ public:
 
   int count() const;
   Patch patch(int index) const;
+
+  /*!
+   * \brief warmSubmodulePatches
+   * Pre-generate the patches for any submodule deltas and hold them on this
+   * diff. git_patch_from_diff() on a submodule rescans the submodule's whole
+   * worktree just to decide whether to print "-dirty", which costs hundreds
+   * of milliseconds on a large submodule. Doing it here lets a worker thread
+   * absorb that, so the UI thread gets a cache hit when the diff is rendered.
+   * Deliberately limited to submodules: they have no stageable hunks, so
+   * handing the same Patch to more than one consumer cannot disturb staging.
+   */
+  void warmSubmodulePatches();
   QString name(int index) const;
   bool isBinary(int index) const;
   git_delta_t status(int index) const;
@@ -92,6 +105,9 @@ private:
 
     git_diff *diff;
     Index index;
+
+    // Populated only by warmSubmodulePatches().
+    QHash<int, QSharedPointer<Patch>> warmedPatches;
   };
 
   Diff(git_diff *diff);

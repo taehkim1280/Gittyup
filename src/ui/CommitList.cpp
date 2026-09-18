@@ -149,7 +149,15 @@ public:
     mStatus.setFuture(QtConcurrent::run([this] {
       // Pass the repo's index to suppress reload.
       bool ignoreWhitespace = Settings::instance()->isWhitespaceIgnored();
-      return mRepo.status(mRepo.index(), &mStatusCallbacks, ignoreWhitespace);
+      git::Diff diff =
+          mRepo.status(mRepo.index(), &mStatusCallbacks, ignoreWhitespace);
+
+      // Generating a submodule's patch rescans that submodule's whole
+      // worktree, which costs hundreds of milliseconds on a large one. It
+      // used to happen on the UI thread when the diff was rendered; do it
+      // here instead so the render gets a cache hit.
+      diff.warmSubmodulePatches();
+      return diff;
     }));
   }
 
