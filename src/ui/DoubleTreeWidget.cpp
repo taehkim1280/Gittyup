@@ -621,12 +621,17 @@ void DoubleTreeWidget::filesSelected(const QModelIndexList &indexes) {
   if (indexes.isEmpty())
     return;
 
-  // Selection restored programmatically by loadSelection(). setDiff() is
-  // already loading the editor and rebuilding the diff view, so reacting here
-  // just repeats all of that work. mIgnoreSelectionChange was introduced for
-  // exactly this but was never actually consulted anywhere.
-  if (mIgnoreSelectionChange)
+  // Selection restored programmatically by loadSelection(). The diff still
+  // has to be populated here: DiffView::setDiff() only resets state and
+  // installs an empty widget, the file widgets themselves come from
+  // updateFiles(). What we can skip is loadEditorContent(), which also loads
+  // the blame editor - that pane is not visible and filling it was the bulk
+  // of the cost. mIgnoreSelectionChange was introduced for this but was never
+  // actually consulted anywhere.
+  if (mIgnoreSelectionChange) {
+    mDiffView->updateFiles();
     return;
+  }
 
   QObject *obj = QObject::sender();
   if (obj) {
