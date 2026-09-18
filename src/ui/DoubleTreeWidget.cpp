@@ -85,12 +85,12 @@ QAction *DoubleTreeWidget::setupAppearanceAction(const char *name,
 DoubleTreeWidget::DoubleTreeWidget(const git::Repository &repo, QWidget *parent)
     : ContentWidget(parent) {
   // first column
-  // top (Buttons to switch between Blame editor and DiffView)
-  SegmentedButton *segmentedButton = new SegmentedButton(this);
-  QPushButton *blameView = new QPushButton(tr("Blame"), this);
-  segmentedButton->addButton(blameView, tr("Show Blame Editor"), true);
-  QPushButton *diffView = new QPushButton(tr("Diff"), this);
-  segmentedButton->addButton(diffView, tr("Show Diff View"), true);
+  // The blame editor is no longer reachable from here - the view switcher is
+  // gone and the stack stays on the diff. mEditor is still constructed below
+  // because it backs find()/findNext()/findPrevious() and is the same widget
+  // EditorWindow hands to the settings and config dialogs. It is never shown,
+  // and BlameEditor only starts a blame on TextEditor::onVisible, so no blame
+  // is ever computed.
 
   // Context button.
   ContextMenuButton *contextButton = new ContextMenuButton(this);
@@ -113,8 +113,6 @@ DoubleTreeWidget::DoubleTreeWidget(const git::Repository &repo, QWidget *parent)
   contextMenu->addAction(multiColumn);
   contextMenu->addAction(hideUntrackedFiles);
   QHBoxLayout *buttonLayout = new QHBoxLayout();
-  buttonLayout->addStretch();
-  buttonLayout->addWidget(segmentedButton);
   buttonLayout->addStretch();
   buttonLayout->addWidget(contextButton);
 
@@ -240,20 +238,6 @@ DoubleTreeWidget::DoubleTreeWidget(const git::Repository &repo, QWidget *parent)
 
   setLayout(layout);
 
-  const QButtonGroup *viewGroup = segmentedButton->buttonGroup();
-  connect(
-      viewGroup, QOverload<int>::of(&QButtonGroup::idClicked), this,
-      [this](int id) {
-        mFileView->setCurrentIndex(id);
-        // Change selection mode.
-        if (id == Blame) {
-          stagedFiles->setSelectionMode(QAbstractItemView::SingleSelection);
-          unstagedFiles->setSelectionMode(QAbstractItemView::SingleSelection);
-        } else {
-          stagedFiles->setSelectionMode(QAbstractItemView::ExtendedSelection);
-          unstagedFiles->setSelectionMode(QAbstractItemView::ExtendedSelection);
-        }
-      });
 
   connect(mDiffTreeModel, &DiffTreeModel::checkStateChanged, this,
           &DoubleTreeWidget::treeModelStateChanged);
