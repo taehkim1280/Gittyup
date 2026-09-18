@@ -33,6 +33,8 @@ theme['palette']   = {
 theme['widget']    = {
   text             = { default = '#E1E5F2', disabled = '#555B65' },
   bright_text      = '#AAB2BE',
+  -- placeholder/hint text in search and filter fields
+  placeholder_text = '#9BA3B1',
   background       = '#212226',
   alternate        = '#2D2E34', -- an alternate background color for list rows
   highlight        = { active = '#2A82DA', inactive = '#1B5B9B' },

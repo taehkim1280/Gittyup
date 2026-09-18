@@ -113,6 +113,18 @@ _HunkWidget::Header::Header(const git::Diff &diff, const git::Patch &patch,
             &_HunkWidget::Header::discard);
   }
 
+  // Add cherry-pick button. The inverse of discard: only meaningful when
+  // looking at an existing commit, where there is a change to pull into the
+  // working copy rather than one to throw away.
+  QToolButton *cherryPick = nullptr;
+  if (!diff.isStatusDiff() && !submodule && !patch.isConflicted()) {
+    cherryPick = new QToolButton(this);
+    cherryPick->setText(HunkWidget::tr("Cherry-pick"));
+    cherryPick->setToolTip(HunkWidget::tr("Cherry-pick Hunk"));
+    connect(cherryPick, &QToolButton::clicked, this,
+            &_HunkWidget::Header::cherryPick);
+  }
+
   mButton = new DisclosureButton(this);
   mButton->setToolTip(mButton->isChecked() ? HunkWidget::tr("Collapse Hunk")
                                            : HunkWidget::tr("Expand Hunk"));
@@ -138,6 +150,8 @@ _HunkWidget::Header::Header(const git::Diff &diff, const git::Patch &patch,
   buttons->addWidget(edit);
   if (discard)
     buttons->addWidget(discard);
+  if (cherryPick)
+    buttons->addWidget(cherryPick);
   buttons->addWidget(mButton);
 
   QHBoxLayout *layout = new QHBoxLayout(this);
@@ -203,6 +217,8 @@ HunkWidget::HunkWidget(DiffView *view, const git::Diff &diff,
   mHeader = new _HunkWidget::Header(diff, patch, index, lfs, submodule, this);
   layout->addWidget(mHeader);
   connect(mHeader, &_HunkWidget::Header::discard, this, &HunkWidget::discard);
+  connect(mHeader, &_HunkWidget::Header::cherryPick, this,
+          [this] { emit cherryPickSignal(this, -1, -1); });
 
   mEditor = new Editor(this);
   mEditor->setLexer(patch.name());
@@ -220,6 +236,10 @@ HunkWidget::HunkWidget(DiffView *view, const git::Diff &diff,
           &HunkWidget::unstageSelected);
   connect(mEditor, &TextEditor::discardSelectedSignal, this,
           &HunkWidget::discardDialog);
+  connect(mEditor, &TextEditor::cherryPickSelectedSignal, this,
+          [this](int startLine, int end) {
+            emit cherryPickSignal(this, startLine, end);
+          });
   connect(mEditor, &TextEditor::marginClicked, this,
           &HunkWidget::marginClicked);
 
@@ -1187,6 +1207,77 @@ QByteArray HunkWidget::hunk() const {
   }
 
   return ar;
+}
+
+QByteArray HunkWidget::cherryPickDiff(int startLine, int endLine) const {
+  const int lineCount = mEditor->lineCount();
+  if (startLine < 0 || endLine < 0) {
+    startLine = 0;
+    endLine = lineCount;
+  }
+
+  const git_diff_hunk *hunk = mPatch.header_struct(mIndex);
+  if (!hunk)
+    return QByteArray();
+
+  QByteArray body;
+  int oldCount = 0;
+  int newCount = 0;
+  int picked = 0;
+
+  for (int i = 0; i < lineCount; ++i) {
+    const int mask = mEditor->markers(i);
+    const bool selected = (i >= startLine && i < endLine);
+    const bool addition = mask & 1 << TextEditor::Marker::Addition;
+    const bool deletion = mask & 1 << TextEditor::Marker::Deletion;
+
+    QByteArray text = mEditor->line(i).toUtf8();
+    const bool noNewline = mEditor->annotationLines(i) > 0 &&
+                           mEditor->annotationText(i) == noNewLineAtEndOfFile;
+    if (noNewline && text.endsWith('\n'))
+      text.chop(1);
+
+    char prefix;
+    if (addition) {
+      // An addition that is not picked simply does not exist on either side.
+      if (!selected)
+        continue;
+      prefix = '+';
+      ++newCount;
+      ++picked;
+    } else if (deletion) {
+      if (selected) {
+        prefix = '-';
+        ++oldCount;
+        ++picked;
+      } else {
+        // Not removing this line, so it survives into the new side as context.
+        prefix = ' ';
+        ++oldCount;
+        ++newCount;
+      }
+    } else {
+      prefix = ' ';
+      ++oldCount;
+      ++newCount;
+    }
+
+    body.append(prefix).append(text);
+    if (noNewline)
+      body.append("\n\\ No newline at end of file\n");
+  }
+
+  if (!picked)
+    return QByteArray();
+
+  // The patch is applied against the working copy, so both sides are anchored
+  // at the hunk's old start; git_apply locates the real position by context.
+  const int start = hunk->old_start;
+  QByteArray header = "@@ -" + QByteArray::number(start) + "," +
+                      QByteArray::number(oldCount) + " +" +
+                      QByteArray::number(start) + "," +
+                      QByteArray::number(newCount) + " @@\n";
+  return header + body;
 }
 
 QByteArray HunkWidget::apply() {

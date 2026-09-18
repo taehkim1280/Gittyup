@@ -221,6 +221,20 @@ public:
   bool cherryPick(const Commit &commit);
 
   // checkout
+  /*!
+   * \brief Apply a unified diff to the working directory.
+   * Used to cherry-pick a file, hunk or line selection out of an existing
+   * commit: the caller generates a patch describing just that selection and
+   * git_apply matches it against the working copy by context. Where the
+   * surrounding lines no longer match it refuses the patch and leaves the
+   * file untouched, rather than splicing at a wrong offset the way a purely
+   * positional apply would.
+   * \param diffText Unified diff text.
+   * \param error Set to a human readable message when application fails.
+   * \return true when the patch was applied.
+   */
+  bool applyToWorkdir(const QByteArray &diffText, QString *error = nullptr);
+
   bool checkout(const Commit &commit, CheckoutCallbacks *callbacks = nullptr,
                 const QStringList &paths = QStringList(),
                 int strategy = GIT_CHECKOUT_SAFE);

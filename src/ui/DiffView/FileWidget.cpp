@@ -113,6 +113,16 @@ _FileWidget::Header::Header(const git::Diff &diff, const git::Patch &patch,
   connect(mDiscardButton, &QToolButton::clicked, this,
           &_FileWidget::Header::discard);
 
+  // Add cherry-pick button - the counterpart to discard, shown when viewing
+  // an existing commit rather than the working copy.
+  mCherryPickButton = new QToolButton(this);
+  mCherryPickButton->setText(FileWidget::tr("Cherry-pick"));
+  mCherryPickButton->setVisible(false);
+  mCherryPickButton->setToolTip(FileWidget::tr("Cherry-pick File"));
+  buttons->addWidget(mCherryPickButton);
+  connect(mCherryPickButton, &QToolButton::clicked, this,
+          &_FileWidget::Header::cherryPick);
+
   mDisclosureButton = new DisclosureButton(this);
   mDisclosureButton->setToolTip(mDisclosureButton->isChecked()
                                     ? FileWidget::tr("Collapse File")
@@ -277,6 +287,8 @@ void _FileWidget::Header::updatePatch(const git::Patch &patch) {
 
   mDiscardButton->setVisible(mDiff.isStatusDiff() && !mSubmodule &&
                              !isConflicted);
+  mCherryPickButton->setVisible(!mDiff.isStatusDiff() && !mSubmodule &&
+                                !isConflicted);
 }
 QCheckBox *_FileWidget::Header::check() const { return mCheck; }
 
@@ -369,6 +381,8 @@ FileWidget::FileWidget(DiffView *view, const git::Diff &diff,
   connect(mHeader, &_FileWidget::Header::stageStateChanged, this,
           &FileWidget::headerCheckStateChanged);
   connect(mHeader, &_FileWidget::Header::discard, this, &FileWidget::discard);
+  connect(mHeader, &_FileWidget::Header::cherryPick, this,
+          &FileWidget::cherryPickFile);
   layout->addWidget(mHeader);
 
   DisclosureButton *disclosureButton = mHeader->disclosureButton();
@@ -680,6 +694,8 @@ HunkWidget *FileWidget::addHunk(const git::Diff &diff, const git::Patch &patch,
             this->stageHunks(hunk, state, false);
           });
   connect(hunk, &HunkWidget::discardSignal, this, &FileWidget::discardHunk);
+  connect(hunk, &HunkWidget::cherryPickSignal, this,
+          &FileWidget::cherryPickHunk);
   TextEditor *editor = hunk->editor(false);
 
   // Respond to editor diagnostic signal.
@@ -766,6 +782,60 @@ void FileWidget::stageHunks(const HunkWidget *hunk,
 
   // TODO: index.add should notify the model directly!
   emit stageStateChanged(mModelIndex, git::Index::PartiallyStaged);
+}
+
+void FileWidget::cherryPickHunk(HunkWidget *hunk, int startLine, int end) {
+  QByteArray section = hunk->cherryPickDiff(startLine, end);
+  if (section.isEmpty())
+    return;
+
+  applyCherryPick({section});
+}
+
+void FileWidget::cherryPickFile() {
+  QList<QByteArray> sections;
+  for (HunkWidget *hunk : mHunks) {
+    QByteArray section = hunk->cherryPickDiff(-1, -1);
+    if (!section.isEmpty())
+      sections.append(section);
+  }
+
+  applyCherryPick(sections);
+}
+
+void FileWidget::applyCherryPick(const QList<QByteArray> &sections) {
+  if (sections.isEmpty())
+    return;
+
+  const QByteArray name = mPatch.name().toUtf8();
+
+  // A file introduced by this commit has no old side to match against.
+  const bool added = !mPatch.blob(git::Diff::OldFile).isValid();
+
+  QByteArray diffText = "diff --git a/" + name + " b/" + name + "\n";
+  diffText += added ? QByteArray("--- /dev/null\n")
+                    : QByteArray("--- a/" + name + "\n");
+  diffText += "+++ b/" + name + "\n";
+  for (const QByteArray &section : sections)
+    diffText += section;
+
+  QString error;
+  git::Repository repo = mPatch.repo();
+  if (!repo.applyToWorkdir(diffText, &error)) {
+    QMessageBox *dialog = new QMessageBox(
+        QMessageBox::Warning, FileWidget::tr("Cherry-pick failed"),
+        FileWidget::tr("The selected changes to '%1' could not be applied "
+                       "to the working copy.")
+            .arg(mPatch.name()),
+        QMessageBox::Ok, this);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->setInformativeText(error);
+    dialog->setDetailedText(QString::fromUtf8(diffText));
+    dialog->open();
+    return;
+  }
+
+  RepoView::parentView(this)->refresh();
 }
 
 void FileWidget::discardHunk() {

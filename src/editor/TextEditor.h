@@ -67,6 +67,7 @@ public:
     stageSelected = 30,
     unstageSelected = 31,
     discardSelected = 32,
+    cherryPickSelected = 33,
   };
 
   struct Range {
@@ -150,6 +151,13 @@ signals:
    * \param end End line of selection + 1
    */
   void discardSelectedSignal(int startPos, int end);
+
+  /*!
+   * \brief cherryPickSelectedSignal
+   * Emitted for the selected line range when viewing an existing commit, to
+   * apply just those lines to the working copy.
+   */
+  void cherryPickSelectedSignal(int startPos, int end);
 
 protected:
   QSize viewportSizeHint() const override;

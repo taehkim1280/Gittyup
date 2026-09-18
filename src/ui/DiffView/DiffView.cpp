@@ -407,8 +407,22 @@ bool DiffView::canFetchMore() {
   auto dtw = dynamic_cast<DoubleTreeWidget *>(
       mParent); // for an unknown reason parent() and p are not the same
   assert(dtw);
-  return mDiff.isValid() &&
-         mFiles.size() < mDiffTreeModel->fileCount(dtw->selectedIndex());
+  if (!mDiff.isValid())
+    return false;
+
+  // Count the files behind *every* selected index, mirroring what fetchMore()
+  // iterates over. This previously used fileCount(selectedIndex()), which only
+  // counted the first selection - and for a leaf file node that is 1, so
+  // loading stopped after a single file even when more were selected.
+  QList<QModelIndex> indices;
+  for (const auto &index : dtw->selectedIndices()) {
+    for (const auto &add : mDiffTreeModel->modelIndices(index)) {
+      if (!indices.contains(add))
+        indices.append(add);
+    }
+  }
+
+  return mFiles.size() < indices.count();
 }
 
 /*!

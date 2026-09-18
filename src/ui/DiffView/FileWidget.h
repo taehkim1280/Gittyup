@@ -47,6 +47,7 @@ public:
 signals:
   void stageStateChanged(int stageState);
   void discard();
+  void cherryPick();
 
 protected:
   void mouseDoubleClickEvent(QMouseEvent *event) override;
@@ -61,6 +62,7 @@ private:
 
   QCheckBox *mCheck{nullptr};
   QToolButton *mLfsButton = nullptr;
+  QToolButton *mCherryPickButton = nullptr;
   EditButton *mEdit{nullptr};
   DiscardButton *mDiscardButton{nullptr};
   DisclosureButton *mDisclosureButton{nullptr};
@@ -136,12 +138,35 @@ public slots:
    */
   void discardHunk();
 
+  /*!
+   * \brief cherryPickHunk
+   * Apply a hunk, or a line range within it, of the commit being viewed to
+   * the working copy. Emitted by the hunk itself.
+   * \param hunk The originating hunk.
+   * \param startLine First editor line, or -1 for the whole hunk.
+   * \param end One past the last editor line.
+   */
+  void cherryPickHunk(HunkWidget *hunk, int startLine, int end);
+
+  /*!
+   * \brief cherryPickFile
+   * Apply every hunk of this file to the working copy.
+   */
+  void cherryPickFile();
+
 signals:
   void diagnosticAdded(TextEditor::DiagnosticKind kind);
   void stageStateChanged(const QModelIndex &idx, git::Index::StagedState state);
   void discarded(const QModelIndex &idx);
 
 private:
+  /*!
+   * \brief applyCherryPick
+   * Assemble the file header and the given hunk sections into a unified diff
+   * and apply it to the working copy via git_apply.
+   */
+  void applyCherryPick(const QList<QByteArray> &sections);
+
   void discard();
 
   DiffView *mView{nullptr};

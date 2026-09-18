@@ -305,6 +305,25 @@ void CustomTheme::polish(QPalette &palette) const {
   setPaletteColors(palette, QPalette::HighlightedText,
                    widget.value("highlighted_text"));
 
+  // Qt resolves PlaceholderText from the style's default palette rather than
+  // from our Text color, so on a dark theme the placeholder strings in the
+  // search and filter fields stay near-black and are effectively invisible.
+  // Honor an explicit theme value if there is one, otherwise derive a dimmed
+  // version of the widget text color.
+  QVariant placeholder = widget.value("placeholder_text");
+  if (placeholder.isValid()) {
+    setPaletteColors(palette, QPalette::PlaceholderText, placeholder);
+  } else {
+    QVariant textValue = widget.value("text");
+    QColor color = textValue.canConvert<QColor>()
+                       ? textValue.value<QColor>()
+                       : QColor(textValue.toMap().value("default").toString());
+    if (color.isValid()) {
+      color.setAlphaF(0.6);
+      palette.setColor(QPalette::PlaceholderText, color);
+    }
+  }
+
   QVariantMap window = mMap.value("window").toMap();
   setPaletteColors(palette, QPalette::WindowText, window.value("text"));
   setPaletteColors(palette, QPalette::Window, window.value("background"));

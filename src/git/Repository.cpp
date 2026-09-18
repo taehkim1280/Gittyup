@@ -29,6 +29,7 @@
 #include "Tree.h"
 #include "util/Path.h"
 #include "git2/buffer.h"
+#include "git2/apply.h"
 #include "git2/branch.h"
 #include "git2/checkout.h"
 #include "git2/cherrypick.h"
@@ -1013,6 +1014,36 @@ bool Repository::cherryPick(const Commit &commit) {
     emit d->notifier->stateChanged();
 
   return !error;
+}
+
+namespace {
+
+QString lastGitError(const QString &fallback) {
+  const git_error *err = git_error_last();
+  return (err && err->message) ? QString::fromUtf8(err->message) : fallback;
+}
+
+} // namespace
+
+bool Repository::applyToWorkdir(const QByteArray &diffText, QString *error) {
+  git_diff *diff = nullptr;
+  if (git_diff_from_buffer(&diff, diffText.constData(), diffText.length())) {
+    if (error)
+      *error = lastGitError(tr("failed to parse the generated patch"));
+    return false;
+  }
+
+  git_apply_options opts = GIT_APPLY_OPTIONS_INIT;
+  int err = git_apply(d->repo, diff, GIT_APPLY_LOCATION_WORKDIR, &opts);
+  git_diff_free(diff);
+
+  if (err) {
+    if (error)
+      *error = lastGitError(tr("the patch does not apply to the working copy"));
+    return false;
+  }
+
+  return true;
 }
 
 bool Repository::checkout(const Commit &commit, CheckoutCallbacks *callbacks,

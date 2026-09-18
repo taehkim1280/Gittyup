@@ -480,6 +480,9 @@ void TextEditor::ContextMenu(Scintilla::Point pt) {
               .toStdString()
               .data(),
           discardSelected, diffLines > 0);
+    } else {
+      AddToPopUp("");
+      AddToPopUp("Cherry-pick selected", cherryPickSelected, diffLines > 0);
     }
     AddToPopUp("");
     AddToPopUp("Select All", idcmdSelectAll);
@@ -533,6 +536,12 @@ void TextEditor::Command(int cmdId) {
       int startLine = lineFromPosition(selectionStart());
       int end = lineFromPosition(selectionEnd()) + 1;
       emit unstageSelectedSignal(startLine, end);
+      break;
+    }
+    case cherryPickSelected: {
+      int startLine = lineFromPosition(selectionStart());
+      int end = lineFromPosition(selectionEnd()) + 1;
+      emit cherryPickSelectedSignal(startLine, end);
       break;
     }
     case discardSelected: {

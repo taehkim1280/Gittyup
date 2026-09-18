@@ -1009,111 +1009,61 @@ public:
 
       } else {
 
-        // Draw Name.
-        QString name = "";
+        // The summary keeps the view font size but is drawn slightly bolder.
+        // The author sits below it, unbolded and two points smaller, so it
+        // reads as secondary to the summary.
+        QFont msgFont = opt.font;
+        msgFont.setWeight(QFont::DemiBold);
+        QFont nameFont = opt.font;
+        nameFont.setWeight(QFont::Normal);
+        if (opt.font.pointSizeF() > 0)
+          nameFont.setPointSizeF(qMax(1.0, opt.font.pointSizeF() - 2));
+        else
+          nameFont.setPixelSize(qMax(1, opt.font.pixelSize() - 2));
+
+        // Draw message on the first line, always elided to a single line.
+        QRect msgRect = rect;
+        QRect msgStar = rect;
+        msgStar.setX(msgStar.x() + msgStar.width() - msgStar.height());
+        msgRect.setWidth(msgRect.width() - msgStar.width());
+
+        painter->save();
+        painter->setPen(bright);
+        painter->setFont(msgFont);
+        QString msg = commit.summary(git::Commit::SubstituteEmoji);
+        const QFontMetrics msgFm(msgFont);
+        painter->drawText(
+            msgRect, Qt::AlignLeft,
+            msgFm.elidedText(msg, Qt::ElideRight, msgRect.width()));
+        painter->restore();
+
+        // Move down to the second line for the author and references.
+        rect.setY(rect.y() + constants.lineSpacing + constants.vMargin);
+
+        // Draw Name. The commit date and id are deliberately not drawn in
+        // this mode; the card shows the summary and the author only.
+        int nameWidth = 0;
         if (showAuthor) {
-          name = commit.author().name();
+          QString name = commit.author().name();
           painter->save();
-          QFont bold = opt.font;
-          bold.setBold(true);
-          painter->setFont(bold);
+          painter->setFont(nameFont);
           painter->drawText(rect, Qt::AlignLeft, name);
           painter->restore();
+          nameWidth = QFontMetrics(nameFont).horizontalAdvance(name);
         }
 
-        // Draw date.
-        if (showDate &&
-            rect.width() > fm.horizontalAdvance(name) + timestampWidth + 8) {
-          painter->save();
-          painter->setPen(bright);
-          if (showAuthor) {
-            painter->drawText(rect, Qt::AlignRight, timestamp);
-          } else {
-            painter->drawText(rect, Qt::AlignLeft, timestamp);
-          }
-          painter->restore();
-        }
-
-        // Draw id.
-        QString id = "";
-        if (showId) {
-          QRect idRect = rect;
-          if (showAuthor || showDate) {
-            idRect.setY(idRect.y() + constants.lineSpacing + constants.vMargin);
-          }
-          id = commit.shortId();
-          painter->save();
-          painter->drawText(idRect, Qt::AlignLeft, id);
-          painter->restore();
-        }
-
-        // Draw references.
+        // Draw references after the author name.
         QList<Badge::Label> refs = mRefs.value(commit.id());
         if (!refs.isEmpty()) {
           QRect refsRect = rect;
-          QString leftText = "";
-
-          if (showDate && showAuthor) {
-            refsRect.setY(refsRect.y() + constants.lineSpacing +
-                          constants.vMargin);
-            if (showId) {
-              leftText = id;
-            }
-          } else {
-            if (showDate) {
-              leftText = timestamp;
-            } else if (showAuthor) {
-              leftText = name;
-            } else if (showId) {
-              leftText = id;
-            }
-          }
-          refsRect.setX(refsRect.x() + fm.boundingRect(leftText).width() + 6);
+          if (nameWidth > 0)
+            refsRect.setX(refsRect.x() + nameWidth + 6);
           Badge::paint(painter, refs, refsRect, &opt);
         }
 
-        int numOptional = 0;
-        if (showId)
-          ++numOptional;
-        if (showAuthor)
-          ++numOptional;
-        if (showDate)
-          ++numOptional;
-        if (numOptional > 1) {
-          rect.setY(rect.y() + constants.lineSpacing + constants.vMargin);
-        }
-
-        rect.setY(rect.y() + constants.lineSpacing + constants.vMargin);
-
-        // Divide remaining rectangle.
+        // The star sits at the end of the last line.
         star = rect;
         star.setX(star.x() + star.width() - star.height());
-        QRect text = rect;
-        text.setWidth(text.width() - star.width());
-
-        // Draw message.
-        painter->save();
-        painter->setPen(bright);
-        QString msg = commit.summary(git::Commit::SubstituteEmoji);
-        QTextLayout layout(msg, painter->font());
-        layout.beginLayout();
-
-        QTextLine line = layout.createLine();
-        if (line.isValid()) {
-          int width = text.width();
-          line.setLineWidth(width);
-          int len = line.textLength();
-          painter->drawText(text, Qt::AlignLeft, msg.left(len));
-
-          if (len < msg.length()) {
-            text.setY(text.y() + constants.lineSpacing);
-            QString elided = fm.elidedText(msg.mid(len), Qt::ElideRight, width);
-            painter->drawText(text, Qt::AlignLeft, elided);
-          }
-        }
-
-        layout.endLayout();
-        painter->restore();
       }
 
       // Draw star.
@@ -1188,7 +1138,7 @@ public:
     LayoutConstants constants = layoutConstants(compact);
 
     int lineHeight = constants.lineSpacing + constants.vMargin;
-    return QSize(0, lineHeight * (compact ? 1 : 4));
+    return QSize(0, lineHeight * (compact ? 1 : 3));
   }
 
   QRect decorationRect(const QStyleOptionViewItem &option,

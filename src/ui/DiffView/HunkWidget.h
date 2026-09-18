@@ -54,6 +54,7 @@ protected:
 signals:
   void stageStateChanged(int stageState);
   void discard();
+  void cherryPick();
 
 private:
   QCheckBox *mCheck;
@@ -126,6 +127,18 @@ public:
    */
   void load(git::Patch &staged, bool force = false);
 
+  /*!
+   * \brief cherryPickDiff
+   * Build a unified diff hunk section describing only the selected lines of
+   * this hunk, suitable for git_apply. Unselected additions are omitted and
+   * unselected deletions are emitted as context, so the result applies just
+   * the chosen part of the change.
+   * \param startLine First editor line to pick, or -1 for the whole hunk.
+   * \param endLine One past the last editor line to pick.
+   * \return The hunk section, or an empty array if nothing was selected.
+   */
+  QByteArray cherryPickDiff(int startLine, int endLine) const;
+
 signals:
   /*!
    * It is not possible to stage single hunks.
@@ -136,6 +149,13 @@ signals:
    */
   void stageStateChanged(git::Index::StagedState state);
   void discardSignal();
+
+  /*!
+   * \brief cherryPickSignal
+   * Ask the FileWidget to apply the given line range of this hunk to the
+   * working copy. A range of (-1, -1) means the whole hunk.
+   */
+  void cherryPickSignal(HunkWidget *hunk, int startLine, int end);
 
 protected:
   void paintEvent(QPaintEvent *event);

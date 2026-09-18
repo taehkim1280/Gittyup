@@ -427,12 +427,6 @@ void DoubleTreeWidget::setDiff(const git::Diff &diff, const QString &file,
   // Remember selection.
   storeSelection();
 
-  // Reset model.
-  // because of this, the content in the view is shown.
-  TreeProxy *proxy = static_cast<TreeProxy *>(unstagedFiles->model());
-  DiffTreeModel *model = static_cast<DiffTreeModel *>(proxy->sourceModel());
-  model->setDiff(diff);
-
   // Single tree & list view.
   bool singleTree =
       Settings::instance()
@@ -446,9 +440,22 @@ void DoubleTreeWidget::setDiff(const git::Diff &diff, const QString &file,
           ->value(Setting::Id::ShowChangedFilesMultiColumn, true)
           .toBool();
 
-  // Widget modifications.
+  // Reset model.
+  // because of this, the content in the view is shown.
+  TreeProxy *proxy = static_cast<TreeProxy *>(unstagedFiles->model());
+  DiffTreeModel *model = static_cast<DiffTreeModel *>(proxy->sourceModel());
+
+  // The layout must be chosen *before* the diff is set. createDiffTree()
+  // flattens the node tree while building it, using mListView, and
+  // enableListView() only stores that flag without resetting the model. When
+  // it was set after setDiff(), the tree stayed built for the previous mode,
+  // so a nested tree could be rendered with the list view's decorations
+  // switched off, leaving every nested file unreachable.
   model->enableListView(listView);
   model->setMultiColumn(multiColumn);
+  model->setDiff(diff);
+
+  // Widget modifications.
   stagedFiles->setRootIsDecorated(!listView);
   unstagedFiles->setRootIsDecorated(!listView);
   // mUnstagedCommitedFiles->setVisible(!singleTree);
@@ -473,6 +480,12 @@ void DoubleTreeWidget::setDiff(const git::Diff &diff, const QString &file,
   } else {
     mUnstagedCommitedFiles->setText(kCommitedFiles);
     mStagedWidget->setVisible(false);
+
+    // A commit's files have no staged/unstaged distinction, but the proxy
+    // filter defaults to enabled and tests Qt::CheckStateRole, which resolves
+    // through git::Index::isStaged() against the *live* working index. Left on,
+    // it silently drops committed files that happen to look staged right now.
+    proxy->enableFilter(false);
   }
 
   // do not expand if to many files exist, it takes really long
@@ -555,8 +568,22 @@ void DoubleTreeWidget::loadSelection() {
     }
   }
 
+  // DiffView renders only the selected indices, so selecting a single row
+  // would show one file's diff no matter how many the diff touches. When no
+  // particular file is remembered, select them all - for a commit and for the
+  // working tree alike.
+  const bool selectAllFiles =
+      mSelectedFile.filename.isEmpty() && mDiff.isValid();
+
   mIgnoreSelectionChange = true;
-  if (mSelectedFile.stagedModel) {
+  if (selectAllFiles) {
+    unstagedFiles->selectAll();
+    // isVisibleTo() rather than isVisible(): during startup this widget's
+    // ancestors may not be shown yet, but the staged pane's own hidden state
+    // (set for commits and in single view) is already correct.
+    if (mStagedWidget->isVisibleTo(this))
+      stagedFiles->selectAll();
+  } else if (mSelectedFile.stagedModel) {
     TreeProxy *proxy = static_cast<TreeProxy *>(stagedFiles->model());
     index = proxy->mapFromSource(index);
     stagedFiles->selectionModel()->setCurrentIndex(index,
