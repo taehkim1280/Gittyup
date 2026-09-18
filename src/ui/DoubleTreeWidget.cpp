@@ -112,12 +112,19 @@ DoubleTreeWidget::DoubleTreeWidget(const git::Repository &repo, QWidget *parent)
   contextMenu->addAction(listView);
   contextMenu->addAction(multiColumn);
   contextMenu->addAction(hideUntrackedFiles);
+  // The view switcher used to sit in this row, so it carried the default
+  // layout margins. With only the context button left, drop them so the row
+  // is no taller than the button itself and the diff gets the space back.
   QHBoxLayout *buttonLayout = new QHBoxLayout();
+  buttonLayout->setContentsMargins(0, 0, 2, 0);
+  buttonLayout->setSpacing(0);
   buttonLayout->addStretch();
   buttonLayout->addWidget(contextButton);
 
   // bottom (Stacked widget with Blame editor and DiffView)
   QVBoxLayout *fileViewLayout = new QVBoxLayout();
+  fileViewLayout->setContentsMargins(0, 0, 0, 0);
+  fileViewLayout->setSpacing(0);
   mFileView = new QStackedWidget(this);
   mEditor = new BlameEditor(repo, this);
   mDiffView = new DiffView(repo, this);
