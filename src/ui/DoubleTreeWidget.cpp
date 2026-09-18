@@ -630,6 +630,13 @@ void DoubleTreeWidget::filesSelected(const QModelIndexList &indexes) {
   if (indexes.isEmpty())
     return;
 
+  // Selection restored programmatically by loadSelection(). setDiff() is
+  // already loading the editor and rebuilding the diff view, so reacting here
+  // just repeats all of that work. mIgnoreSelectionChange was introduced for
+  // exactly this but was never actually consulted anywhere.
+  if (mIgnoreSelectionChange)
+    return;
+
   QObject *obj = QObject::sender();
   if (obj) {
     TreeView *treeview = static_cast<TreeView *>(obj);
