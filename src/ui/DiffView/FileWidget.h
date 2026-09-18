@@ -165,7 +165,17 @@ private:
    * Assemble the file header and the given hunk sections into a unified diff
    * and apply it to the working copy via git_apply.
    */
-  void applyCherryPick(const QList<QByteArray> &sections);
+  void applyCherryPick(const QList<QByteArray> &sections,
+                       const QList<HunkWidget *> &hunks);
+
+  /*!
+   * \brief offerMerge
+   * Launch the configured external merge tool for a cherry-pick that could
+   * not be applied. "Theirs" is the commit's parent content with the given
+   * hunks applied - synthesised against the old blob, where the patch's own
+   * offsets are valid by construction - and "ours" is the working copy.
+   */
+  void offerMerge(const QList<HunkWidget *> &hunks);
 
   void discard();
 

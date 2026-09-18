@@ -146,6 +146,14 @@ public:
   // blob
   Blob lookupBlob(const Id &id) const;
 
+  /*!
+   * \brief createBlob
+   * Write a buffer into the object database and return it as a blob. Used to
+   * hand a synthesised "theirs" side to the external merge tool, which takes
+   * blobs rather than raw buffers.
+   */
+  Blob createBlob(const QByteArray &content);
+
   // commit
   RevWalk walker(int sort = GIT_SORT_NONE) const;
   Commit lookupCommit(const QString &prefix) const;

@@ -13,6 +13,7 @@
 #include "git/Patch.h"
 #include "git2/checkout.h"
 #include "git2/diff.h"
+#include "tools/MergeTool.h"
 #include "ui/RepoView.h"
 #include "ui/Badge.h"
 #include "ui/FileContextMenu.h"
@@ -789,7 +790,7 @@ void FileWidget::cherryPickHunk(HunkWidget *hunk, int startLine, int end) {
   if (section.isEmpty())
     return;
 
-  applyCherryPick({section});
+  applyCherryPick({section}, {hunk});
 }
 
 void FileWidget::cherryPickFile() {
@@ -800,10 +801,11 @@ void FileWidget::cherryPickFile() {
       sections.append(section);
   }
 
-  applyCherryPick(sections);
+  applyCherryPick(sections, mHunks);
 }
 
-void FileWidget::applyCherryPick(const QList<QByteArray> &sections) {
+void FileWidget::applyCherryPick(const QList<QByteArray> &sections,
+                                 const QList<HunkWidget *> &hunks) {
   if (sections.isEmpty())
     return;
 
@@ -831,11 +833,67 @@ void FileWidget::applyCherryPick(const QList<QByteArray> &sections) {
     dialog->setAttribute(Qt::WA_DeleteOnClose);
     dialog->setInformativeText(error);
     dialog->setDetailedText(QString::fromUtf8(diffText));
+
+    QPushButton *resolve = dialog->addButton(FileWidget::tr("Resolve..."),
+                                             QMessageBox::AcceptRole);
+    connect(resolve, &QPushButton::clicked, this,
+            [this, hunks] { offerMerge(hunks); });
+
     dialog->open();
     return;
   }
 
   RepoView::parentView(this)->refresh();
+}
+
+void FileWidget::offerMerge(const QList<HunkWidget *> &hunks) {
+  bool shell = false;
+  if (ExternalTool::lookupCommand("merge", shell).isEmpty()) {
+    QMessageBox *dialog = new QMessageBox(
+        QMessageBox::Information, FileWidget::tr("No merge tool configured"),
+        FileWidget::tr("Gittyup has no external merge tool to launch."),
+        QMessageBox::Ok, this);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->setInformativeText(
+        FileWidget::tr("Set one with, for example:\n\n"
+                       "    git config --global merge.tool meld"));
+    dialog->open();
+    return;
+  }
+
+  // "Theirs" is the commit's parent content with the requested hunks applied.
+  // Patch::apply() is positional, but it builds its preimage from the old
+  // blob, which is exactly what the patch's offsets describe - so unlike
+  // targeting the working copy, it is correct here by construction.
+  QBitArray selected(mHunks.size(), false);
+  for (int i = 0; i < mHunks.size(); ++i) {
+    if (hunks.contains(mHunks[i]))
+      selected.setBit(i);
+  }
+
+  git::Repository repo = mPatch.repo();
+  const QString name = mPatch.name();
+
+  git::Blob base = mPatch.blob(git::Diff::OldFile);
+  git::Blob theirs = repo.createBlob(mPatch.apply(selected));
+  git::Blob ours = repo.lookupBlob(repo.workdirId(name));
+
+  if (!theirs.isValid() || !ours.isValid()) {
+    QMessageBox *dialog = new QMessageBox(
+        QMessageBox::Warning, FileWidget::tr("Cannot merge"),
+        FileWidget::tr("Could not read the versions of '%1' needed for a "
+                       "three way merge.")
+            .arg(name),
+        QMessageBox::Ok, this);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->open();
+    return;
+  }
+
+  MergeTool *tool = new MergeTool(repo.workdir().filePath(name), ours, theirs,
+                                  base, this);
+  if (!tool->start())
+    tool->deleteLater();
 }
 
 void FileWidget::discardHunk() {

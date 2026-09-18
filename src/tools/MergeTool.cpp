@@ -70,8 +70,13 @@ bool MergeTool::start() {
     basePath = base->fileName();
   }
 
-  // Make the backup copy.
+  // Make the backup copy. QFile::copy() refuses to overwrite an existing
+  // destination, so a stale .orig left by an earlier attempt would silently
+  // defeat the backup. Clear it first, so the backup always reflects the
+  // working copy as it was immediately before this merge.
   QString backupPath = QString("%1.orig").arg(mFile);
+  if (QFile::exists(backupPath))
+    QFile::remove(backupPath);
   if (!QFile::copy(mFile, backupPath)) {
     // FIXME: What should happen if the backup already exists?
   }

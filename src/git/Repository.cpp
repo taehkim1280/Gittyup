@@ -30,6 +30,7 @@
 #include "util/Path.h"
 #include "git2/buffer.h"
 #include "git2/apply.h"
+#include "git2/blob.h"
 #include "git2/branch.h"
 #include "git2/checkout.h"
 #include "git2/cherrypick.h"
@@ -1024,6 +1025,15 @@ QString lastGitError(const QString &fallback) {
 }
 
 } // namespace
+
+Blob Repository::createBlob(const QByteArray &content) {
+  git_oid id;
+  if (git_blob_create_from_buffer(&id, d->repo, content.constData(),
+                                  content.length()))
+    return Blob();
+
+  return lookupBlob(Id(&id));
+}
 
 bool Repository::applyToWorkdir(const QByteArray &diffText, QString *error) {
   git_diff *diff = nullptr;
