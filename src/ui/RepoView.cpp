@@ -2028,6 +2028,17 @@ void RepoView::checkout(const git::Commit &commit, const git::Reference &ref,
     return;
   }
 
+  // Update submodules to match the newly checked out commit. A post-checkout
+  // hook would normally do this with `git submodule update --init
+  // --recursive`, but Gittyup checks out through libgit2, which does not run
+  // hooks at all. Gated on the same setting the pull and clone paths use, so
+  // it stays opt-in and consistent with them.
+  Settings *settings = Settings::instance();
+  bool updateSubs =
+      settings->value(Setting::Id::UpdateSubmodulesAfterPullAndClone).toBool();
+  if (mRepo.appConfig().value<bool>("autoupdate.enable", updateSubs))
+    updateSubmodules(QList<git::Submodule>(), true, true, false, entry);
+
   mRefs->select(mRepo.head());
 }
 

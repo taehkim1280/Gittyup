@@ -489,6 +489,12 @@ CommitEditor::CommitEditor(const git::Repository &repo, QWidget *parent)
   mCommit->setDefault(true);
   connect(mCommit, &QPushButton::clicked, this, &CommitEditor::commit);
 
+  mAmend = new QPushButton(tr("Amend Previous Commit"), this);
+  mAmend->setObjectName("AmendCommit");
+  connect(mAmend, &QPushButton::clicked, this, [this] {
+    RepoView::parentView(this)->amendCommit();
+  });
+
   mRebaseAbort = new QPushButton(tr("Abort rebasing"), this);
   mRebaseAbort->setObjectName("AbortRebase");
   connect(mRebaseAbort, &QPushButton::clicked, this,
@@ -517,6 +523,7 @@ CommitEditor::CommitEditor(const git::Repository &repo, QWidget *parent)
   buttonLayout->addWidget(mStage);
   buttonLayout->addWidget(mUnstage);
   buttonLayout->addWidget(mCommit);
+  buttonLayout->addWidget(mAmend);
   buttonLayout->addWidget(mRebaseContinue);
   buttonLayout->addWidget(mRebaseAbort);
   buttonLayout->addWidget(mMergeAbort);
@@ -819,6 +826,13 @@ void CommitEditor::updateButtons(bool yieldFocus) {
       mCommit->setEnabled(total && !mMessage->document()->isEmpty());
       break;
   }
+
+  // Amending rewrites HEAD, so it needs a commit to rewrite and is
+  // meaningless while a merge or rebase is in progress - those are finished
+  // with the commit button above.
+  const bool plainState = (repo.state() == GIT_REPOSITORY_STATE_NONE);
+  mAmend->setVisible(plainState);
+  mAmend->setEnabled(plainState && head.isValid() && head.target().isValid());
 
   // Update menu actions.
   MenuBar::instance(this)->updateRepository();
