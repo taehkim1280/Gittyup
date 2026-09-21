@@ -33,6 +33,7 @@ public:
   void stage();
   bool isStageEnabled() const;
   void unstage();
+  void discardAll();
   bool isUnstageEnabled() const;
   static QString createFileList(const QStringList &list, int maxFiles);
   void setMessage(const QStringList &files);
@@ -57,6 +58,7 @@ private:
   QPushButton *mUnstage;
   QPushButton *mCommit;
   QPushButton *mAmend;
+  QPushButton *mDiscardAll;
   QPushButton *mRebaseAbort;
   QPushButton *mRebaseContinue;
   QPushButton *mMergeAbort;

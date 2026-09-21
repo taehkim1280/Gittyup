@@ -6,6 +6,8 @@
 #include "ContextMenuButton.h"
 #include "MenuBar.h"
 #include "RepoView.h"
+#include "git/Submodule.h"
+#include "git2/checkout.h"
 
 #include <QLabel>
 #include <QPushButton>
@@ -485,6 +487,10 @@ CommitEditor::CommitEditor(const git::Repository &repo, QWidget *parent)
   mUnstage = new QPushButton(tr("Unstage All"), this);
   connect(mUnstage, &QPushButton::clicked, this, &CommitEditor::unstage);
 
+  mDiscardAll = new QPushButton(tr("Discard All"), this);
+  mDiscardAll->setObjectName("DiscardAll");
+  connect(mDiscardAll, &QPushButton::clicked, this, &CommitEditor::discardAll);
+
   mCommit = new QPushButton(tr("Commit"), this);
   mCommit->setDefault(true);
   connect(mCommit, &QPushButton::clicked, this, &CommitEditor::commit);
@@ -522,6 +528,7 @@ CommitEditor::CommitEditor(const git::Repository &repo, QWidget *parent)
   buttonLayout->addStretch();
   buttonLayout->addWidget(mStage);
   buttonLayout->addWidget(mUnstage);
+  buttonLayout->addWidget(mDiscardAll);
   buttonLayout->addWidget(mCommit);
   buttonLayout->addWidget(mAmend);
   buttonLayout->addWidget(mRebaseContinue);
@@ -572,6 +579,71 @@ void CommitEditor::stage() { mDiff.setAllStaged(true); }
 bool CommitEditor::isStageEnabled() const { return mStage->isEnabled(); }
 
 void CommitEditor::unstage() { mDiff.setAllStaged(false); }
+
+void CommitEditor::discardAll() {
+  RepoView *view = RepoView::parentView(this);
+  if (!view || !mDiff.isValid())
+    return;
+
+  // Collect the tracked changes. Untracked files are deliberately left alone:
+  // discarding restores tracked files from HEAD, it is not a `git clean`, and
+  // deleting files git never knew about is not recoverable.
+  QStringList modified;
+  QList<git::Submodule> submodules;
+  git::Repository repo = view->repo();
+  for (int i = 0; i < mDiff.count(); ++i) {
+    QString name = mDiff.name(i);
+    switch (mDiff.status(i)) {
+      case GIT_DELTA_DELETED:
+      case GIT_DELTA_MODIFIED:
+      case GIT_DELTA_TYPECHANGE:
+      case GIT_DELTA_RENAMED:
+        if (git::Submodule submodule = repo.lookupSubmodule(name))
+          submodules.append(submodule);
+        else
+          modified.append(name);
+        break;
+      default:
+        break;
+    }
+  }
+
+  if (modified.isEmpty() && submodules.isEmpty())
+    return;
+
+  QMessageBox *dialog = new QMessageBox(
+      QMessageBox::Warning, tr("Discard All Changes?"),
+      tr("Are you sure you want to discard all changes to tracked files?"),
+      QMessageBox::Cancel, view);
+  dialog->setAttribute(Qt::WA_DeleteOnClose);
+  dialog->setInformativeText(
+      tr("This action cannot be undone. Untracked files are left alone."));
+
+  QString detailedText = modified.join(QChar::LineFeed);
+  for (const git::Submodule &s : submodules)
+    detailedText += QChar::LineFeed + s.path() + " " + tr("(Submodule)");
+  dialog->setDetailedText(detailedText);
+
+  QPushButton *discard =
+      dialog->addButton(tr("Discard All"), QMessageBox::AcceptRole);
+  discard->setObjectName("DiscardAllButton");
+  connect(discard, &QPushButton::clicked, [view, modified, submodules] {
+    git::Repository repo = view->repo();
+    int strategy = GIT_CHECKOUT_FORCE;
+    if (modified.count() &&
+        !repo.checkout(git::Commit(), nullptr, modified, strategy)) {
+      QString text = tr("%1 files").arg(modified.size());
+      LogEntry *parent = view->addLogEntry(text, tr("Discard"));
+      view->error(parent, tr("discard"), text);
+    }
+
+    view->updateSubmodules(submodules, true, false, true);
+    if (submodules.isEmpty())
+      view->refresh();
+  });
+
+  dialog->open();
+}
 
 bool CommitEditor::isUnstageEnabled() const { return mUnstage->isEnabled(); }
 
