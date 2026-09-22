@@ -229,7 +229,7 @@ public:
 
   void fetchMore(const QModelIndex &parent) {
     FetchResult fetched = fetchRows(mWalker, mParents, mRows, mPathspec,
-                                    mGraphVisible, mRefsFilter);
+                                    mGraphVisible, mRefsFilter, mPreferred);
 
     // Update the model.
     if (!fetched.rows.isEmpty()) {
@@ -330,8 +330,10 @@ signals:
 
 private:
   struct Parent {
-    Parent(const git::Commit &commit, const QColor &color, bool tainted = false)
-        : commit(commit), color(color), tainted(tainted) {}
+    Parent(const git::Commit &commit, const QColor &color,
+           bool tainted = false, bool preferred = false)
+        : commit(commit), color(color), tainted(tainted), preferred(preferred) {
+    }
 
     QColor taintedColor(const git::Commit &commit = git::Commit()) const {
       return (tainted && this->commit != commit) ? kTaintedColor : color;
@@ -340,6 +342,10 @@ private:
     git::Commit commit;
     QColor color;
     bool tainted;
+
+    // The mainline lane. Shared history keeps this lane's colour even when
+    // a side branch reached it first.
+    bool preferred;
   };
 
   struct Segment {
@@ -382,6 +388,7 @@ private:
     QList<Parent> parents;
     QList<Row> rows;
     git::RevWalk walker;
+    git::Commit preferred;
 
     // Whether this particular reset was triggered by the status check
     // finishing, and should therefore emit statusFinished() once applied.
@@ -513,10 +520,41 @@ private:
   // returning the new rows. Operates purely on its arguments (no access to
   // 'this' state) so it can run on a background thread as well as
   // synchronously from fetchMore().
+  // Pick the mainline branch by name. Substring matching, so taehoon/master
+  // and binsentry_master are recognised as well as plain master; an exact
+  // "master"/"main" wins over a longer name, and among equals the shortest
+  // name wins, which keeps master ahead of master_backup.
+  static git::Commit mainlineCommit(const git::Repository &repo) {
+    git::Commit best;
+    QString bestName;
+    for (const git::Reference &ref : repo.refs()) {
+      if (!ref.isLocalBranch())
+        continue;
+
+      const QString name = ref.name();
+      const QString lower = name.toLower();
+      if (!lower.contains("master") && !lower.contains("main"))
+        continue;
+
+      const bool exact = (lower == "master" || lower == "main");
+      const QString bestLower = bestName.toLower();
+      const bool bestExact = (bestLower == "master" || bestLower == "main");
+
+      if (bestName.isEmpty() || (exact && !bestExact) ||
+          (exact == bestExact && name.length() < bestName.length())) {
+        bestName = name;
+        best = ref.target();
+      }
+    }
+
+    return best;
+  }
+
   static FetchResult fetchRows(git::RevWalk &walker, QList<Parent> &parents,
                                const QList<Row> &existingRows,
                                const QString &pathspec, bool graphVisible,
-                               CommitList::RefsFilter refsFilter) {
+                               CommitList::RefsFilter refsFilter,
+                               const git::Commit &preferred) {
     FetchResult result;
     int i = 0;
     git::Commit commit = walker.next(pathspec);
@@ -525,7 +563,8 @@ private:
       bool root = false;
       if (indexOf(parents, commit) < 0) {
         root = true;
-        parents.append(Parent(commit, nextColor(parents)));
+        parents.append(Parent(commit, nextColor(parents), false,
+                              preferred.isValid() && commit == preferred));
       }
 
       // Calculate graph columns.
@@ -550,9 +589,25 @@ private:
         Parent parent = parents.takeAt(index);
         if (!replacements.isEmpty()) {
           git::Commit replacement = replacements.takeFirst();
-          parents.insert(index, Parent(replacement, parent.color));
+          parents.insert(index,
+                         Parent(replacement, parent.color, false,
+                                parent.preferred));
           for (const git::Commit &replacement : replacements)
             parents.append(Parent(replacement, nextColor(parents)));
+        } else if (parent.preferred) {
+          // The mainline has converged onto a commit some side branch
+          // claimed first - it reached shared history sooner because its tip
+          // is dated between the mainline's commits. Rather than letting the
+          // mainline lane silently disappear here, hand its colour to the
+          // surviving lane so shared history keeps the mainline's colour.
+          const QList<git::Commit> commitParents = commit.parents();
+          if (!commitParents.isEmpty()) {
+            int existing = indexOf(parents, commitParents.first());
+            if (existing >= 0) {
+              parents[existing].color = parent.color;
+              parents[existing].preferred = true;
+            }
+          }
         }
       }
 
@@ -580,6 +635,7 @@ private:
   // result rather than mutating model state directly.
   static ResetResult computeReset(const ResetContext &ctx) {
     ResetResult result;
+    result.preferred = mainlineCommit(ctx.repo);
 
     // Update status row.
     bool head = (!ctx.ref.isValid() || ctx.ref.isHead());
@@ -588,8 +644,13 @@ private:
       QVector<Column> row;
       if (ctx.graphVisible && ctx.ref.isValid() && ctx.statusCheckFinished) {
         row.append({Segment(Bottom, kTaintedColor), Segment(Dot, QColor())});
+        // Mark this lane preferred here too: it is registered before
+        // fetchRows() runs, so the mainline tip never reaches the root path
+        // that would otherwise tag it.
         result.parents.append(
-            Parent(ctx.ref.target(), nextColor(result.parents), true));
+            Parent(ctx.ref.target(), nextColor(result.parents), true,
+                   result.preferred.isValid() &&
+                       ctx.ref.target() == result.preferred));
       }
       result.rows.append(Row(git::Commit(), row)); // Uncommitted changes
     }
@@ -648,7 +709,7 @@ private:
     if (result.walker.isValid()) {
       FetchResult fetched =
           fetchRows(result.walker, result.parents, result.rows, ctx.pathspec,
-                    ctx.graphVisible, ctx.refsFilter);
+                    ctx.graphVisible, ctx.refsFilter, result.preferred);
       result.rows.append(fetched.rows);
       if (fetched.exhausted)
         result.walker = git::RevWalk();
@@ -684,6 +745,7 @@ private:
     mParents = std::move(result.parents);
     mRows = std::move(result.rows);
     mWalker = std::move(result.walker);
+    mPreferred = result.preferred;
     DebugRefresh("");
     endResetModel();
     emit loadingChanged(false);
@@ -704,6 +766,7 @@ private:
 
   QList<Row> mRows;
   QList<Parent> mParents;
+  git::Commit mPreferred;
 
   // walker settings
   bool mSuppressResetWalker{false};
