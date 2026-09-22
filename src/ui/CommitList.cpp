@@ -947,15 +947,16 @@ public:
             painter->drawLine(x, y4, x2, y4);
             break;
 
-          // The control point sits at the horizontal end's x, on the
-          // starting y, so the curve leaves the dot sideways and only turns
-          // vertical as it reaches the neighbouring column. Putting it at
-          // (x1, y4) instead - the vertical line's x - is what made these
-          // run vertically first and bend out at the last moment.
+          // Straight segments meeting at a right angle, rather than a
+          // curve. The corner sits at (x1, y4) so the horizontal run shares
+          // y4 with the Cross segments that carry a lane across intervening
+          // columns - drawing it at any other height leaves the elbows and
+          // the crossings visibly out of line.
           case RightOut: {
             QPainterPath path;
             path.moveTo(x1, y3);
-            path.quadTo(x2, y3, x2, y4);
+            path.lineTo(x1, y4);
+            path.lineTo(x2, y4);
             painter->drawPath(path);
             break;
           }
@@ -963,7 +964,8 @@ public:
           case LeftOut: {
             QPainterPath path;
             path.moveTo(x1, y3);
-            path.quadTo(x, y3, x, y4);
+            path.lineTo(x1, y4);
+            path.lineTo(x, y4);
             painter->drawPath(path);
             break;
           }
@@ -971,7 +973,8 @@ public:
           case RightIn: {
             QPainterPath path;
             path.moveTo(x1, y5);
-            path.quadTo(x2, y5, x2, y4);
+            path.lineTo(x1, y4);
+            path.lineTo(x2, y4);
             painter->drawPath(path);
             break;
           }
@@ -979,7 +982,8 @@ public:
           case LeftIn: {
             QPainterPath path;
             path.moveTo(x1, y5);
-            path.quadTo(x, y5, x, y4);
+            path.lineTo(x1, y4);
+            path.lineTo(x, y4);
             painter->drawPath(path);
             break;
           }
