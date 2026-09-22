@@ -28,8 +28,14 @@ struct AmendInfo {
 class AmendDialog : public QDialog {
   Q_OBJECT
 public:
+  /*!
+   * \param messageOnly Hide the author and committer boxes and present the
+   * dialog purely as a message editor. The caller is then responsible for
+   * passing the original signatures back through unchanged.
+   */
   AmendDialog(const git::Signature &author, const git::Signature &committer,
-              const QString &commitMessage, QWidget *parent = nullptr);
+              const QString &commitMessage, QWidget *parent = nullptr,
+              bool messageOnly = false);
 
   AmendInfo getInfo() const;
 

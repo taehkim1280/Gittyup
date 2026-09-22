@@ -1538,6 +1538,29 @@ void CommitList::suppressResetWalker(bool suppress) {
   static_cast<CommitModel *>(mModel)->suppressResetWalker(suppress);
 }
 
+void CommitList::scrollToHead() {
+  RepoView *view = RepoView::parentView(this);
+  if (!view)
+    return;
+
+  git::Reference head = view->repo().head();
+  if (!head.isValid())
+    return;
+
+  git::Commit target = head.target();
+  if (!target.isValid())
+    return;
+
+  QAbstractItemModel *m = model();
+  for (int i = 0; i < m->rowCount(); ++i) {
+    QModelIndex index = m->index(i, 0);
+    if (index.data(CommitRole).value<git::Commit>() == target) {
+      scrollTo(index, QAbstractItemView::PositionAtCenter);
+      return;
+    }
+  }
+}
+
 void CommitList::resetReference(const git::Reference &ref) {
   static_cast<CommitModel *>(mModel)->resetReference(ref);
 }

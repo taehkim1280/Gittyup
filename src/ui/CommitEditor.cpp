@@ -501,6 +501,12 @@ CommitEditor::CommitEditor(const git::Repository &repo, QWidget *parent)
     RepoView::parentView(this)->amendCommit();
   });
 
+  mEditMessage = new QPushButton(tr("Edit Message"), this);
+  mEditMessage->setObjectName("EditMessage");
+  connect(mEditMessage, &QPushButton::clicked, this, [this] {
+    RepoView::parentView(this)->editCommitMessage();
+  });
+
   mRebaseAbort = new QPushButton(tr("Abort rebasing"), this);
   mRebaseAbort->setObjectName("AbortRebase");
   connect(mRebaseAbort, &QPushButton::clicked, this,
@@ -531,6 +537,7 @@ CommitEditor::CommitEditor(const git::Repository &repo, QWidget *parent)
   buttonLayout->addWidget(mDiscardAll);
   buttonLayout->addWidget(mCommit);
   buttonLayout->addWidget(mAmend);
+  buttonLayout->addWidget(mEditMessage);
   buttonLayout->addWidget(mRebaseContinue);
   buttonLayout->addWidget(mRebaseAbort);
   buttonLayout->addWidget(mMergeAbort);
@@ -905,6 +912,9 @@ void CommitEditor::updateButtons(bool yieldFocus) {
   const bool plainState = (repo.state() == GIT_REPOSITORY_STATE_NONE);
   mAmend->setVisible(plainState);
   mAmend->setEnabled(plainState && head.isValid() && head.target().isValid());
+  mEditMessage->setVisible(plainState);
+  mEditMessage->setEnabled(plainState && head.isValid() &&
+                           head.target().isValid());
 
   // Update menu actions.
   MenuBar::instance(this)->updateRepository();

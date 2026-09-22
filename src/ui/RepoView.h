@@ -241,6 +241,18 @@ public:
               LogEntry *parent = nullptr, bool force = false);
   void amendCommit();
 
+  /*!
+   * \brief editCommitMessage
+   * Reword HEAD, leaving author and committer untouched.
+   */
+  void editCommitMessage();
+
+  /*!
+   * \brief scrollToHead
+   * Bring the commit HEAD points at into view in the commit list.
+   */
+  void scrollToHead();
+
   // checkout
   void promptToCheckout();
   void checkout(const git::Commit &commit, const QStringList &paths);

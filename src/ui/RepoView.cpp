@@ -1913,6 +1913,31 @@ void RepoView::amendCommit() {
   promptToAmend(commit);
 }
 
+void RepoView::scrollToHead() { mCommits->scrollToHead(); }
+
+void RepoView::editCommitMessage() {
+  git::Branch head = mRepo.head();
+  if (!head.isValid())
+    return;
+
+  git::Commit commit = head.target();
+  if (!commit.isValid())
+    return;
+
+  auto *d = new AmendDialog(commit.author(), commit.committer(),
+                            commit.message(), this, true);
+  d->setAttribute(Qt::WA_DeleteOnClose);
+  connect(d, &QDialog::accepted, [this, d, commit] {
+    // Pass the original signatures straight back, rather than reading them
+    // out of the hidden widgets, so rewording cannot disturb authorship or
+    // either timestamp.
+    amend(commit, commit.author(), commit.committer(),
+          d->getInfo().commitMessage);
+  });
+
+  d->show();
+}
+
 void RepoView::promptToCheckout() {
   git::Reference ref = reference();
   CheckoutDialog *dialog = new CheckoutDialog(mRepo, ref, this);

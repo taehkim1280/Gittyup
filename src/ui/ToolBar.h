@@ -51,6 +51,7 @@ private:
   QToolButton *mStashPopButton;
 
   QToolButton *mRefreshButton;
+  QToolButton *mScrollToHeadButton;
 
   QToolButton *mRebaseContinueButton;
   QToolButton *mRebaseAbortButton;

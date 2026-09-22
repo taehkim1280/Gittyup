@@ -352,6 +352,34 @@ public:
   }
 };
 
+class ScrollToHeadButton : public Button {
+  Q_OBJECT
+
+public:
+  ScrollToHeadButton(QWidget *parent = nullptr) : Button(parent) {
+    setObjectName("ScrollToHeadButton");
+    setToolTip(tr("Scroll to HEAD"));
+  }
+
+  void paintEvent(QPaintEvent *event) override {
+    Button::paintEvent(event);
+
+    QStyleOptionToolButton opt;
+    initStyleOption(&opt);
+
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.setPen(QPen(opt.palette.buttonText(), 1.5));
+
+    // A locate marker: ring with a filled centre.
+    qreal x = width() / 2.0;
+    qreal y = height() / 2.0;
+    painter.drawEllipse(QPointF(x, y), 4.5, 4.5);
+    painter.setBrush(opt.palette.buttonText());
+    painter.drawEllipse(QPointF(x, y), 1.5, 1.5);
+  }
+};
+
 class RefreshButton : public Button {
   Q_OBJECT
 
@@ -832,6 +860,11 @@ ToolBar::ToolBar(MainWindow *parent) : QToolBar(parent) {
   connect(mRefreshButton, &Button::clicked,
           [this] { currentView()->refresh(); });
 
+  mScrollToHeadButton = new ScrollToHeadButton(this);
+  addWidget(mScrollToHeadButton);
+  connect(mScrollToHeadButton, &Button::clicked,
+          [this] { currentView()->scrollToHead(); });
+
   if (!qgetenv("GITTYUP_OAUTH").isEmpty()) {
     addWidget(new Spacer(4, this));
 
@@ -973,6 +1006,7 @@ void ToolBar::updateButtons(int ahead, int behind) {
 
   RepoView *view = currentView();
   mRefreshButton->setEnabled(view);
+  mScrollToHeadButton->setEnabled(view);
   if (mPullRequestButton)
     mPullRequestButton->setEnabled(view);
   mCheckoutButton->setEnabled(view && !view->repo().isBare());

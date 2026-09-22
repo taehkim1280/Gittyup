@@ -58,6 +58,7 @@ private:
   QPushButton *mUnstage;
   QPushButton *mCommit;
   QPushButton *mAmend;
+  QPushButton *mEditMessage;
   QPushButton *mDiscardAll;
   QPushButton *mRebaseAbort;
   QPushButton *mRebaseContinue;

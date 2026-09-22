@@ -156,7 +156,8 @@ private:
 
 AmendDialog::AmendDialog(const git::Signature &author,
                          const git::Signature &committer,
-                         const QString &commitMessage, QWidget *parent)
+                         const QString &commitMessage, QWidget *parent,
+                         bool messageOnly)
     : QDialog(parent) {
 
   auto *l = new QGridLayout();
@@ -178,7 +179,13 @@ AmendDialog::AmendDialog(const git::Signature &author,
   l->addWidget(lMessage, Row::CommitMessageLabel, 0);
   l->addWidget(m_commitMessage, Row::CommitMessage, 0, 1, 2);
 
-  auto *ok = new QPushButton(tr("Amend"), this);
+  if (messageOnly) {
+    m_authorInfo->setVisible(false);
+    m_committerInfo->setVisible(false);
+  }
+
+  auto *ok = new QPushButton(messageOnly ? tr("Save Message") : tr("Amend"),
+                             this);
   auto *cancel = new QPushButton(tr("Cancel"), this);
 
   connect(ok, &QPushButton::clicked, this, &QDialog::accept);
