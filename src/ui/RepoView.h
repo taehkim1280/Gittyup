@@ -253,6 +253,18 @@ public:
    */
   void scrollToHead();
 
+  /*! Scroll the commit list to HEAD's first parent. */
+  void scrollToHeadParent();
+
+  /*! Scroll the commit list to a loaded commit having HEAD as a parent. */
+  void scrollToHeadChild();
+
+  /*! Whether HEAD has a parent, i.e. is not the root commit. */
+  bool hasHeadParent() const;
+
+  /*! Whether a commit with HEAD as a parent is currently loaded. */
+  bool hasHeadChild() const;
+
   // checkout
   void promptToCheckout();
   void checkout(const git::Commit &commit, const QStringList &paths);

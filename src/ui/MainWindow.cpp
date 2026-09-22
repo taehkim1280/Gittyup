@@ -261,6 +261,15 @@ RepoView *MainWindow::addTab(const git::Repository &repo) {
   connect(notifier, &git::RepositoryNotifier::stateChanged, this,
           [this] { updateWindowTitle(); });
 
+  // The commit list is populated asynchronously, so toolbar state that
+  // depends on its contents - whether HEAD has a loaded child - is not
+  // knowable when referenceUpdated fires. Re-run the update once loading
+  // settles.
+  connect(view, &RepoView::loadingChanged, this, [this](bool loading) {
+    if (!loading)
+      updateInterface();
+  });
+
   emit tabs->tabAboutToBeInserted();
   tabs->setCurrentIndex(tabs->addTab(view, dir.dirName()));
 

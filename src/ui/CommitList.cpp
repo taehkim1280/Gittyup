@@ -1538,28 +1538,82 @@ void CommitList::suppressResetWalker(bool suppress) {
   static_cast<CommitModel *>(mModel)->suppressResetWalker(suppress);
 }
 
-void CommitList::scrollToHead() {
-  RepoView *view = RepoView::parentView(this);
+namespace {
+
+// Git only records parent links, so a commit's children can only be found by
+// looking for rows that point back at it. Confined to what the list has
+// already loaded, which is fine here: a child of HEAD sits above it, and
+// anything above HEAD is loaded before HEAD itself is.
+git::Commit findLoadedChild(const QAbstractItemModel *model,
+                            const git::Commit &parent) {
+  if (!model || !parent.isValid())
+    return git::Commit();
+
+  for (int i = 0; i < model->rowCount(); ++i) {
+    git::Commit candidate = model->index(i, 0)
+                                .data(CommitList::CommitRole)
+                                .value<git::Commit>();
+    if (!candidate.isValid())
+      continue;
+
+    for (const git::Commit &p : candidate.parents()) {
+      if (p == parent)
+        return candidate;
+    }
+  }
+
+  return git::Commit();
+}
+
+git::Commit headCommit(const CommitList *list) {
+  RepoView *view = RepoView::parentView(const_cast<CommitList *>(list));
   if (!view)
-    return;
+    return git::Commit();
 
   git::Reference head = view->repo().head();
-  if (!head.isValid())
-    return;
+  return head.isValid() ? head.target() : git::Commit();
+}
 
-  git::Commit target = head.target();
-  if (!target.isValid())
+} // namespace
+
+void CommitList::scrollToCommit(const git::Commit &commit) {
+  if (!commit.isValid())
     return;
 
   QAbstractItemModel *m = model();
   for (int i = 0; i < m->rowCount(); ++i) {
     QModelIndex index = m->index(i, 0);
-    if (index.data(CommitRole).value<git::Commit>() == target) {
+    if (index.data(CommitRole).value<git::Commit>() == commit) {
+      // Move the highlight too, exactly as clicking the row would, so the
+      // detail view follows along. Goes through selectIndexes() rather than
+      // the selection model directly, so the diff plumbing behaves the same
+      // as a click.
+      selectIndexes(QItemSelection(index, index), QString(), true);
       scrollTo(index, QAbstractItemView::PositionAtCenter);
       return;
     }
   }
 }
+
+void CommitList::scrollToHeadParent() {
+  git::Commit head = headCommit(this);
+  if (!head.isValid())
+    return;
+
+  QList<git::Commit> parents = head.parents();
+  if (!parents.isEmpty())
+    scrollToCommit(parents.first());
+}
+
+void CommitList::scrollToHeadChild() {
+  scrollToCommit(findLoadedChild(model(), headCommit(this)));
+}
+
+bool CommitList::hasHeadChild() const {
+  return findLoadedChild(model(), headCommit(this)).isValid();
+}
+
+void CommitList::scrollToHead() { scrollToCommit(headCommit(this)); }
 
 void CommitList::resetReference(const git::Reference &ref) {
   static_cast<CommitModel *>(mModel)->resetReference(ref);

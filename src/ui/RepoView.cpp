@@ -1915,6 +1915,21 @@ void RepoView::amendCommit() {
 
 void RepoView::scrollToHead() { mCommits->scrollToHead(); }
 
+void RepoView::scrollToHeadParent() { mCommits->scrollToHeadParent(); }
+
+void RepoView::scrollToHeadChild() { mCommits->scrollToHeadChild(); }
+
+bool RepoView::hasHeadParent() const {
+  git::Reference head = mRepo.head();
+  if (!head.isValid())
+    return false;
+
+  git::Commit commit = head.target();
+  return commit.isValid() && !commit.parents().isEmpty();
+}
+
+bool RepoView::hasHeadChild() const { return mCommits->hasHeadChild(); }
+
 void RepoView::editCommitMessage() {
   git::Branch head = mRepo.head();
   if (!head.isValid())

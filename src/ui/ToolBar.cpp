@@ -352,6 +352,46 @@ public:
   }
 };
 
+class HeadStepButton : public Button {
+  Q_OBJECT
+
+public:
+  enum Direction { Parent, Child };
+
+  HeadStepButton(Direction direction, QWidget *parent = nullptr)
+      : Button(parent), mDirection(direction) {
+    setObjectName(direction == Parent ? "HeadParentButton"
+                                      : "HeadChildButton");
+    setToolTip(direction == Parent ? tr("Scroll to HEAD's Parent")
+                                   : tr("Scroll to HEAD's Child"));
+  }
+
+  void paintEvent(QPaintEvent *event) override {
+    Button::paintEvent(event);
+
+    QStyleOptionToolButton opt;
+    initStyleOption(&opt);
+
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.setPen(QPen(opt.palette.buttonText(), 1.5));
+
+    // Chevron pointing away from HEAD: older to the left, newer to the right.
+    qreal x = width() / 2.0;
+    qreal y = height() / 2.0;
+    qreal dx = (mDirection == Parent) ? -2.5 : 2.5;
+
+    QPainterPath path;
+    path.moveTo(x - dx, y - 3.5);
+    path.lineTo(x + dx, y);
+    path.lineTo(x - dx, y + 3.5);
+    painter.drawPath(path);
+  }
+
+private:
+  Direction mDirection;
+};
+
 class ScrollToHeadButton : public Button {
   Q_OBJECT
 
@@ -860,10 +900,20 @@ ToolBar::ToolBar(MainWindow *parent) : QToolBar(parent) {
   connect(mRefreshButton, &Button::clicked,
           [this] { currentView()->refresh(); });
 
+  mHeadParentButton = new HeadStepButton(HeadStepButton::Parent, this);
+  addWidget(mHeadParentButton);
+  connect(mHeadParentButton, &Button::clicked,
+          [this] { currentView()->scrollToHeadParent(); });
+
   mScrollToHeadButton = new ScrollToHeadButton(this);
   addWidget(mScrollToHeadButton);
   connect(mScrollToHeadButton, &Button::clicked,
           [this] { currentView()->scrollToHead(); });
+
+  mHeadChildButton = new HeadStepButton(HeadStepButton::Child, this);
+  addWidget(mHeadChildButton);
+  connect(mHeadChildButton, &Button::clicked,
+          [this] { currentView()->scrollToHeadChild(); });
 
   if (!qgetenv("GITTYUP_OAUTH").isEmpty()) {
     addWidget(new Spacer(4, this));
@@ -1007,6 +1057,8 @@ void ToolBar::updateButtons(int ahead, int behind) {
   RepoView *view = currentView();
   mRefreshButton->setEnabled(view);
   mScrollToHeadButton->setEnabled(view);
+  mHeadParentButton->setEnabled(view && view->hasHeadParent());
+  mHeadChildButton->setEnabled(view && view->hasHeadChild());
   if (mPullRequestButton)
     mPullRequestButton->setEnabled(view);
   mCheckoutButton->setEnabled(view && !view->repo().isBare());

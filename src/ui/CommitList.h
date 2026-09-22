@@ -60,6 +60,27 @@ public:
    * selection.
    */
   void scrollToHead();
+
+  /*!
+   * \brief scrollToHeadParent
+   * Scroll to HEAD's first parent. Merge commits have several; the first is
+   * the one that continues the branch being viewed.
+   */
+  void scrollToHeadParent();
+
+  /*!
+   * \brief scrollToHeadChild
+   * Scroll to a loaded commit that has HEAD as a parent, if there is one.
+   */
+  void scrollToHeadChild();
+
+  /*! Whether a commit with HEAD as a parent is currently loaded. */
+  bool hasHeadChild() const;
+
+private:
+  void scrollToCommit(const git::Commit &commit);
+
+public:
   void selectCommitRelative(int offset);
   bool selectRange(const QString &range, const QString &file = QString(),
                    bool spontaneous = false);
