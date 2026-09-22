@@ -594,6 +594,23 @@ private:
       result.rows.append(Row(git::Commit(), row)); // Uncommitted changes
     }
 
+    // The stash is not a branch. refs/stash points at the newest stash entry,
+    // so walking it follows that commit's parents straight back into the
+    // pre-stash history rather than listing the stashes. The list itself
+    // lives in the ref's reflog, so enumerate it with git_stash_foreach and
+    // give each entry its own row - the "commits on a __stash__ branch" view.
+    //
+    // Display only. Apply, pop and drop still go through the normal stash
+    // machinery, and because no status row is added for this ref, a row's
+    // index is the stash index those actions already expect.
+    if (ctx.ref.isValid() && ctx.ref.isStash()) {
+      for (const git::Commit &stash : ctx.repo.stashes())
+        result.rows.append(Row(stash, QVector<Column>()));
+
+      result.emitStatusFinished = ctx.emitStatusFinished;
+      return result;
+    }
+
     // Begin walking commits.
     if (ctx.ref.isValid()) {
       int sort = GIT_SORT_NONE;
