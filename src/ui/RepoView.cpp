@@ -454,6 +454,8 @@ void RepoView::diffSelected(const git::Diff diff, const QString &file,
   mHistory->update(diff.isValid() ? location() : Location(),
                    spontaneous); // TODO: why this changes diff?
   mDetails->setDiff(diff2, file, mPathspec->pathspec());
+
+  emit commitSelectionChanged();
 }
 
 RepoView::~RepoView() {
@@ -1915,20 +1917,15 @@ void RepoView::amendCommit() {
 
 void RepoView::scrollToHead() { mCommits->scrollToHead(); }
 
-void RepoView::scrollToHeadParent() { mCommits->scrollToHeadParent(); }
+void RepoView::scrollToSelectedParent() { mCommits->scrollToSelectedParent(); }
 
-void RepoView::scrollToHeadChild() { mCommits->scrollToHeadChild(); }
+void RepoView::scrollToSelectedChild() { mCommits->scrollToSelectedChild(); }
 
-bool RepoView::hasHeadParent() const {
-  git::Reference head = mRepo.head();
-  if (!head.isValid())
-    return false;
-
-  git::Commit commit = head.target();
-  return commit.isValid() && !commit.parents().isEmpty();
+bool RepoView::hasSelectedParent() const {
+  return mCommits->hasSelectedParent();
 }
 
-bool RepoView::hasHeadChild() const { return mCommits->hasHeadChild(); }
+bool RepoView::hasSelectedChild() const { return mCommits->hasSelectedChild(); }
 
 void RepoView::editCommitMessage() {
   git::Branch head = mRepo.head();

@@ -253,17 +253,17 @@ public:
    */
   void scrollToHead();
 
-  /*! Scroll the commit list to HEAD's first parent. */
-  void scrollToHeadParent();
+  /*! Step the commit list to the selected commit's first parent. */
+  void scrollToSelectedParent();
 
-  /*! Scroll the commit list to a loaded commit having HEAD as a parent. */
-  void scrollToHeadChild();
+  /*! Step the commit list to a child of the selected commit. */
+  void scrollToSelectedChild();
 
-  /*! Whether HEAD has a parent, i.e. is not the root commit. */
-  bool hasHeadParent() const;
+  /*! Whether the selected commit has a parent. */
+  bool hasSelectedParent() const;
 
-  /*! Whether a commit with HEAD as a parent is currently loaded. */
-  bool hasHeadChild() const;
+  /*! Whether a loaded commit has the selected commit as a parent. */
+  bool hasSelectedChild() const;
 
   // checkout
   void promptToCheckout();
@@ -389,6 +389,13 @@ private slots:
 signals:
   void statusChanged(bool dirty);
   void loadingChanged(bool loading);
+
+  /*!
+   * Emitted when the selected commit changes, so anything keyed off the
+   * selection - the parent/child arrows, for instance - can refresh without
+   * waiting for a full interface update.
+   */
+  void commitSelectionChanged();
 
 protected:
   void showEvent(QShowEvent *event) override;

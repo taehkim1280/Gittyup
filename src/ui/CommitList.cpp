@@ -1595,22 +1595,37 @@ void CommitList::scrollToCommit(const git::Commit &commit) {
   }
 }
 
-void CommitList::scrollToHeadParent() {
-  git::Commit head = headCommit(this);
-  if (!head.isValid())
+git::Commit CommitList::currentCommit() const {
+  QList<git::Commit> commits = selectedCommits();
+  if (!commits.isEmpty() && commits.first().isValid())
+    return commits.first();
+
+  // The uncommitted-changes row carries no commit of its own, so treat HEAD
+  // as the point being stood on and let the arrows work from there too.
+  return headCommit(this);
+}
+
+void CommitList::scrollToSelectedParent() {
+  git::Commit commit = currentCommit();
+  if (!commit.isValid())
     return;
 
-  QList<git::Commit> parents = head.parents();
+  QList<git::Commit> parents = commit.parents();
   if (!parents.isEmpty())
     scrollToCommit(parents.first());
 }
 
-void CommitList::scrollToHeadChild() {
-  scrollToCommit(findLoadedChild(model(), headCommit(this)));
+void CommitList::scrollToSelectedChild() {
+  scrollToCommit(findLoadedChild(model(), currentCommit()));
 }
 
-bool CommitList::hasHeadChild() const {
-  return findLoadedChild(model(), headCommit(this)).isValid();
+bool CommitList::hasSelectedParent() const {
+  git::Commit commit = currentCommit();
+  return commit.isValid() && !commit.parents().isEmpty();
+}
+
+bool CommitList::hasSelectedChild() const {
+  return findLoadedChild(model(), currentCommit()).isValid();
 }
 
 void CommitList::scrollToHead() { scrollToCommit(headCommit(this)); }

@@ -30,6 +30,12 @@ public:
 
 private:
   void updateButtons(int ahead, int behind);
+
+  /*!
+   * Refresh just the parent/child arrows. Cheap enough to run on every
+   * selection change, unlike updateButtons(), which recomputes ahead/behind.
+   */
+  void updateCommitNavigation();
   void updateRemote(int ahead, int behind);
   void updateHistory();
   void updateStash();
@@ -51,9 +57,9 @@ private:
   QToolButton *mStashPopButton;
 
   QToolButton *mRefreshButton;
-  QToolButton *mHeadParentButton;
+  QToolButton *mParentButton;
   QToolButton *mScrollToHeadButton;
-  QToolButton *mHeadChildButton;
+  QToolButton *mChildButton;
 
   QToolButton *mRebaseContinueButton;
   QToolButton *mRebaseAbortButton;

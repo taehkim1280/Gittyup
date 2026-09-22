@@ -62,20 +62,31 @@ public:
   void scrollToHead();
 
   /*!
-   * \brief scrollToHeadParent
-   * Scroll to HEAD's first parent. Merge commits have several; the first is
-   * the one that continues the branch being viewed.
+   * \brief scrollToSelectedParent
+   * Move to the selected commit's first parent. Merge commits have several;
+   * the first is the one that continues the branch being viewed. Repeated
+   * use walks back through history.
    */
-  void scrollToHeadParent();
+  void scrollToSelectedParent();
 
   /*!
-   * \brief scrollToHeadChild
-   * Scroll to a loaded commit that has HEAD as a parent, if there is one.
+   * \brief scrollToSelectedChild
+   * Move to a loaded commit having the selected commit as a parent, walking
+   * forwards again.
    */
-  void scrollToHeadChild();
+  void scrollToSelectedChild();
 
-  /*! Whether a commit with HEAD as a parent is currently loaded. */
-  bool hasHeadChild() const;
+  /*! Whether the selected commit has a parent. */
+  bool hasSelectedParent() const;
+
+  /*! Whether a loaded commit has the selected commit as a parent. */
+  bool hasSelectedChild() const;
+
+  /*!
+   * The commit the arrows step from: the selection, or HEAD when the
+   * uncommitted-changes row is selected and there is no commit of its own.
+   */
+  git::Commit currentCommit() const;
 
 private:
   void scrollToCommit(const git::Commit &commit);

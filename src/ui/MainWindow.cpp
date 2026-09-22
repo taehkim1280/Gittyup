@@ -270,6 +270,12 @@ RepoView *MainWindow::addTab(const git::Repository &repo) {
       updateInterface();
   });
 
+  // Selection drives the arrows, and selection changes far more often than
+  // anything else the toolbar shows - so refresh only those two buttons
+  // rather than running the whole interface update.
+  connect(view, &RepoView::commitSelectionChanged, this,
+          [this] { mToolBar->updateCommitNavigation(); });
+
   emit tabs->tabAboutToBeInserted();
   tabs->setCurrentIndex(tabs->addTab(view, dir.dirName()));
 

@@ -360,10 +360,10 @@ public:
 
   HeadStepButton(Direction direction, QWidget *parent = nullptr)
       : Button(parent), mDirection(direction) {
-    setObjectName(direction == Parent ? "HeadParentButton"
-                                      : "HeadChildButton");
-    setToolTip(direction == Parent ? tr("Scroll to HEAD's Parent")
-                                   : tr("Scroll to HEAD's Child"));
+    setObjectName(direction == Parent ? "ParentButton" : "ChildButton");
+    setToolTip(direction == Parent
+                   ? tr("Go to Selected Commit's Parent")
+                   : tr("Go to Selected Commit's Child"));
   }
 
   void paintEvent(QPaintEvent *event) override {
@@ -900,20 +900,20 @@ ToolBar::ToolBar(MainWindow *parent) : QToolBar(parent) {
   connect(mRefreshButton, &Button::clicked,
           [this] { currentView()->refresh(); });
 
-  mHeadParentButton = new HeadStepButton(HeadStepButton::Parent, this);
-  addWidget(mHeadParentButton);
-  connect(mHeadParentButton, &Button::clicked,
-          [this] { currentView()->scrollToHeadParent(); });
+  mParentButton = new HeadStepButton(HeadStepButton::Parent, this);
+  addWidget(mParentButton);
+  connect(mParentButton, &Button::clicked,
+          [this] { currentView()->scrollToSelectedParent(); });
 
   mScrollToHeadButton = new ScrollToHeadButton(this);
   addWidget(mScrollToHeadButton);
   connect(mScrollToHeadButton, &Button::clicked,
           [this] { currentView()->scrollToHead(); });
 
-  mHeadChildButton = new HeadStepButton(HeadStepButton::Child, this);
-  addWidget(mHeadChildButton);
-  connect(mHeadChildButton, &Button::clicked,
-          [this] { currentView()->scrollToHeadChild(); });
+  mChildButton = new HeadStepButton(HeadStepButton::Child, this);
+  addWidget(mChildButton);
+  connect(mChildButton, &Button::clicked,
+          [this] { currentView()->scrollToSelectedChild(); });
 
   if (!qgetenv("GITTYUP_OAUTH").isEmpty()) {
     addWidget(new Spacer(4, this));
@@ -1057,11 +1057,16 @@ void ToolBar::updateButtons(int ahead, int behind) {
   RepoView *view = currentView();
   mRefreshButton->setEnabled(view);
   mScrollToHeadButton->setEnabled(view);
-  mHeadParentButton->setEnabled(view && view->hasHeadParent());
-  mHeadChildButton->setEnabled(view && view->hasHeadChild());
+  updateCommitNavigation();
   if (mPullRequestButton)
     mPullRequestButton->setEnabled(view);
   mCheckoutButton->setEnabled(view && !view->repo().isBare());
+}
+
+void ToolBar::updateCommitNavigation() {
+  RepoView *view = currentView();
+  mParentButton->setEnabled(view && view->hasSelectedParent());
+  mChildButton->setEnabled(view && view->hasSelectedChild());
 }
 
 void ToolBar::updateRemote(int ahead, int behind) {
