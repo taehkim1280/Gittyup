@@ -884,10 +884,15 @@ public:
             painter->drawLine(x, y4, x2, y4);
             break;
 
+          // The control point sits at the horizontal end's x, on the
+          // starting y, so the curve leaves the dot sideways and only turns
+          // vertical as it reaches the neighbouring column. Putting it at
+          // (x1, y4) instead - the vertical line's x - is what made these
+          // run vertically first and bend out at the last moment.
           case RightOut: {
             QPainterPath path;
             path.moveTo(x1, y3);
-            path.quadTo(x1, y4, x2, y4);
+            path.quadTo(x2, y3, x2, y4);
             painter->drawPath(path);
             break;
           }
@@ -895,7 +900,7 @@ public:
           case LeftOut: {
             QPainterPath path;
             path.moveTo(x1, y3);
-            path.quadTo(x1, y4, x, y4);
+            path.quadTo(x, y3, x, y4);
             painter->drawPath(path);
             break;
           }
@@ -903,7 +908,7 @@ public:
           case RightIn: {
             QPainterPath path;
             path.moveTo(x1, y5);
-            path.quadTo(x1, y4, x2, y4);
+            path.quadTo(x2, y5, x2, y4);
             painter->drawPath(path);
             break;
           }
@@ -911,7 +916,7 @@ public:
           case LeftIn: {
             QPainterPath path;
             path.moveTo(x1, y5);
-            path.quadTo(x1, y4, x, y4);
+            path.quadTo(x, y5, x, y4);
             painter->drawPath(path);
             break;
           }
